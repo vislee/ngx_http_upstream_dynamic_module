@@ -7,7 +7,7 @@ Table of Contents
 =================
 * [Name](#name)
 * [Status](#status)
-* [Example Configuration](#example configuration)
+* [Example Configuration](#example-configuration)
 * [Directives](#directives)
     * [server_resolver](#server_resolver)
     * [http_upstream_conf](#http_upstream_conf)
