@@ -547,7 +547,7 @@ ngx_http_upstream_init_resolver_peer(ngx_http_request_t *r,
     temp.name = host;
     ctx = ngx_resolve_start(clcf->resolver, &temp);
     if (ctx == NULL) {
-        return NGX_OK;
+        goto failed;
     }
     if (ctx == NGX_NO_RESOLVER) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
