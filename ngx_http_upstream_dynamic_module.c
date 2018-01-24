@@ -276,8 +276,12 @@ ngx_http_upstream_resolve_handler(ngx_resolver_ctx_t *ctx) {
     ngx_http_upstream_rr_peers_t       *peers;
     ngx_http_upstream_rr_peer_t        *peer, *nxt, **ups_nxt;
     time_t                              fail_timeout;
-    ngx_int_t                           weight, max_conns, max_fails;
+    ngx_int_t                           weight, max_fails;
     struct sockaddr_in                 *sin, *peer_sin;
+
+    #if (nginx_version >= 1011005)
+    ngx_int_t                           max_conns;
+    #endif
 
     peers = urctx->uscf->peer.data;
     port  = urctx->port;
@@ -321,7 +325,9 @@ ngx_http_upstream_resolve_handler(ngx_resolver_ctx_t *ctx) {
 
     fail_timeout = 10;
     weight = 1;
+    #if (nginx_version >= 1011005)
     max_conns = 0;
+    #endif
     max_fails = 1;
 
     ngx_http_upstream_rr_peers_wlock(peers);
@@ -338,7 +344,9 @@ ngx_http_upstream_resolve_handler(ngx_resolver_ctx_t *ctx) {
         }
 
         fail_timeout = peer->fail_timeout;
+        #if (nginx_version >= 1011005)
         max_conns    = peer->max_conns;
+        #endif
         max_fails    = peer->max_fails;
         weight       = peer->weight;
 
@@ -388,7 +396,9 @@ ngx_http_upstream_resolve_handler(ngx_resolver_ctx_t *ctx) {
             continue;
         }
         peer->fail_timeout = fail_timeout;
+        #if (nginx_version >= 1011005)
         peer->max_conns = max_conns;
+        #endif
         peer->max_fails = max_fails;
         peer->weight = weight;
         peer->effective_weight = weight;
@@ -594,6 +604,7 @@ static size_t
 ngx_http_upstream_peers_dump_json(ngx_http_request_t *r, ngx_http_upstream_rr_peers_t *peers, ngx_buf_t **buf)
 {
     ngx_buf_t                      *b;
+    ngx_int_t                       max_conns;
     u_char                          flag[64];
     size_t                          len, flen, size;
     ngx_http_upstream_rr_peer_t    *peer;
@@ -605,17 +616,30 @@ ngx_http_upstream_peers_dump_json(ngx_http_request_t *r, ngx_http_upstream_rr_pe
     len = sizeof("{\"\" : {\"peers\" : [  ]}}") - 1 + peers->name->len;
     for (peer = peers->peer; peer != NULL; peer = peer->next) {
         ngx_memset(flag, 0x00, 64);
-        flen = ngx_snprintf(flag, 64, "%d%d%d%d%d%d", peer->weight, peer->max_conns, peer->conns, peer->fails, peer->max_fails, peer->down) - flag;
+        max_conns = 0;
+        #if (nginx_version >= 1011005)
+        max_conns =  peer->max_conns;
+        #endif
+        flen = ngx_snprintf(flag, 64, "%d%d%d%d%d%d",
+            peer->weight, max_conns, peer->conns, peer->fails, peer->max_fails, peer->down) - flag;
 
-        len += sizeof("{\"server\" : \"\", \"name\" : \"\", \"weight\" : , \"max_conns\" : , \"connections\" : , \"fails\" : , \"max_fails\" : , \"down\" : , \"backup\" : false},") - 1 +
+        len += sizeof("{\"server\" : \"\", \"name\" : \"\", \"weight\" : , \"max_conns\" : , \"connections\" : , \
+\"fails\" : , \"max_fails\" : , \"down\" : , \"backup\" : false},") - 1 +
                       peer->server.len + peer->name.len + flen;
     }
+
     if (backup != NULL) {
         for (peer = backup->peer; peer != NULL; peer = peer->next) {
             ngx_memset(flag, 0x00, 64);
-            flen = ngx_snprintf(flag, 64, "%d%d%d%d%d%d", peer->weight, peer->max_conns, peer->conns, peer->fails, peer->max_fails, peer->down) - flag;
+            max_conns = 0;
+            #if (nginx_version >= 1011005)
+            max_conns =  peer->max_conns;
+            #endif
+            flen = ngx_snprintf(flag, 64, "%d%d%d%d%d%d",
+                peer->weight, max_conns, peer->conns, peer->fails, peer->max_fails, peer->down) - flag;
 
-            len += sizeof("{\"server\" : \"\", \"name\" : \"\", \"weight\" : , \"max_conns\" : , \"connections\" : , \"fails\" : , \"max_fails\" : , \"down\" : , \"backup\" : true},") - 1 +
+            len += sizeof("{\"server\" : \"\", \"name\" : \"\", \"weight\" : , \"max_conns\" : , \"connections\" : , \
+\"fails\" : , \"max_fails\" : , \"down\" : , \"backup\" : true},") - 1 +
                           peer->server.len + peer->name.len + flen;
         }
     }
@@ -630,17 +654,28 @@ ngx_http_upstream_peers_dump_json(ngx_http_request_t *r, ngx_http_upstream_rr_pe
     size = b->end - b->last;
     b->last = ngx_snprintf(b->last, size, "{\"%V\" : {\"peers\" : [ ", peers->name);
     for (peer = peers->peer; peer != NULL; peer = peer->next) {
+        max_conns = 0;
+        #if (nginx_version >= 1011005)
+        max_conns =  peer->max_conns;
+        #endif
+
         size = b->end - b->last;
         b->last = ngx_snprintf(b->last, size,
-            "{\"server\" : \"%V\", \"name\" : \"%V\", \"weight\" : %d, \"max_conns\" : %d, \"connections\" : %d, \"fails\" : %d, \"max_fails\" : %d, \"down\" : %d, \"backup\" : false},", 
-            &peer->server, &peer->name, peer->weight, peer->max_conns, peer->conns, peer->fails, peer->max_fails, peer->down);
+            "{\"server\" : \"%V\", \"name\" : \"%V\", \"weight\" : %d, \"max_conns\" : %d, \"connections\" : %d, \
+\"fails\" : %d, \"max_fails\" : %d, \"down\" : %d, \"backup\" : false},",
+            &peer->server, &peer->name, peer->weight, max_conns, peer->conns, peer->fails, peer->max_fails, peer->down);
     }
     if (backup != NULL) {
         for (peer = backup->peer; peer != NULL; peer = peer->next) {
+            max_conns = 0;
+            #if (nginx_version >= 1011005)
+            max_conns =  peer->max_conns;
+            #endif
             size = b->end - b->last;
             b->last = ngx_snprintf(b->last, size,
-                "{\"server\" : \"%V\", \"name\" : \"%V\", \"weight\" : %d, \"max_conns\" : %d, \"connections\" : %d, \"fails\" : %d, \"max_fails\" : %d, \"down\" : %d, \"backup\" : true},", 
-                &peer->server, &peer->name, peer->weight, peer->max_conns, peer->conns, peer->fails, peer->max_fails, peer->down);
+                "{\"server\" : \"%V\", \"name\" : \"%V\", \"weight\" : %d, \"max_conns\" : %d, \"connections\" : %d, \
+\"fails\" : %d, \"max_fails\" : %d, \"down\" : %d, \"backup\" : true},",
+                &peer->server, &peer->name, peer->weight, max_conns, peer->conns, peer->fails, peer->max_fails, peer->down);
         }
     }
     b->last--;
@@ -675,9 +710,13 @@ ngx_http_upstream_peer_add(ngx_http_request_t *r, ngx_http_upstream_rr_peers_t *
                     peers->total_weight += weight - peer->weight;
                     peer->weight = weight;
                 }
+
+                #if (nginx_version >= 1011005)
                 if (max_conns > 0) {
                     peer->max_conns = max_conns;
                 }
+                #endif
+
                 if (max_fails > 0) {
                     peer->max_fails = max_fails;
                 }
@@ -723,7 +762,11 @@ ngx_http_upstream_peer_add(ngx_http_request_t *r, ngx_http_upstream_rr_peers_t *
     ngx_http_upstream_rr_peer_lock(peers, peer);
     peer->fail_timeout = fail_timeout;
     peer->weight = weight;
+
+    #if (nginx_version >= 1011005)
     peer->max_conns = max_conns;
+    #endif
+
     peer->max_fails = max_fails;
     peer->next = peers->peer;
     ngx_http_upstream_rr_peer_unlock(peers, peer);
