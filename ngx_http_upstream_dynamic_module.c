@@ -105,6 +105,10 @@ ngx_http_upstream_server_resolver(ngx_conf_t *cf, ngx_command_t *cmd, void *conf
 
     uscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_upstream_module);
 
+    if (NULL != dscf->init_upstream) {
+        return "is duplicate";
+    }
+
     if (NULL == uscf->shm_zone) {
         return "must reside in the shared memory";
     }

@@ -114,6 +114,8 @@ http://127.0.0.1:8081/http_upstream_conf/down?ups=upstest&ip=1.1.1.1
 TODO
 ====
 
+directives `stream_upstream_conf` modify the upstream server of stream block.
+
 [Back to TOC](#table-of-contents)
 
 Author
